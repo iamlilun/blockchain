@@ -6,7 +6,7 @@ const uuid = require('uuid/v1');
 const port = process.argv[2];
 const rp = require('request-promise');
 
-const nodeAddress = uuid().split('-').join('');
+const nodeAddress = uuid.split('-').join('');
 
 const chain = new Blockchain();
 
@@ -18,15 +18,48 @@ app.use(bodyParser.urlencoded({extended: false}));
  */
 app.get('/blockchain', (req, res) => {
   res.send(chain);
-})
+});
 
 /**
  * 加入一筆交易
  */
 app.post('/transaction', (req, res) => {
-  const blockIndex = chain.createNewTransaction(req.body.amount, req.body.sender, req.body.recipient);
-  res.json({note: `Transaction will be added in block ${blockIndex}.`});
-})
+  const newTransaction = req.body;
+  const blockIndex = chain.addTransactionToPendingTransaction(newTransaction);
+  res.json({note: `transaction will be created in block ${blockIndex}`})
+});
+
+/**
+ * 新增一筆交易並廣播給其它node
+ */
+app.post('/transaction/broadcast', (req, res) => {
+  const newTransaction = chain.createNewTransaction(req.body.amount, req.body.sender, req.body.recipient);
+  chain.addTransactionToPendingTransaction(newTransaction);
+
+  /*--------------------------------
+   | 通知各個節點有新交易加入了
+   |--------------------------------
+   | 輪循裝載到promise array裡
+   | 然後再用promise all方式一次通知
+   |
+   */
+  const requestPromises = [];
+
+  chain.networkNodes.forEach(networkNodeUrl => {
+    const requestOptions = {
+      uri: networkNodeUrl + '/transaction', //call各節點的 /transaction
+      method: 'POST',
+      body: newTransaction,
+      json: true
+    }
+    requestPromises.push(rp(requestOptions));
+  })
+
+  Promise.all(requestPromises)
+    .then(data => {
+      res.json({note: 'Transaction created and broadcast successfully'})
+    })
+});
 
 /**
  * 礦務
@@ -157,4 +190,4 @@ app.post('/register-nodes-bulk', (req, res) => {
 
 app.listen(port, () => {
   console.log(`Listen on port ${port}...`,)
-})
+});

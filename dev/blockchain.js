@@ -1,4 +1,7 @@
 const sha256 = require('sha256');
+const uuid = require('uuid/v1');
+
+
 const currentNodeUrl = process.argv[3];
 
 class Blockchain {
@@ -54,12 +57,21 @@ class Blockchain {
     const newTransaction = {
       amount: amount,
       sender: sender,
-      recipient: recipient
+      recipient: recipient,
+      transactionId: uuid.split('-').join(''),
     }
 
-    this.pendingTransactions.push(newTransaction);
+    return newTransaction;
+  }
 
-    return this.getLastBlock()['index'] + 1;
+  /**
+   * 新增交易到等待區
+   * @param {object} transaction: 交易資料
+   * @returns {*}
+   */
+  addTransactionToPendingTransaction(transaction){
+    this.pendingTransactions.push(transaction);
+    return this.getLastBlock().index + 1;
   }
 
   /**
