@@ -66,27 +66,92 @@ app.post('/transaction/broadcast', (req, res) => {
  */
 app.get('/mine', (req, res) => {
   const lastBlock = chain.getLastBlock(); //取得最後一個區塊資料
-  const previousBlockHash = lastBlock.hash; //chain 取得鏈的雜湊值
+  const previousBlockHash = lastBlock.hash; //取得上一個區塊的雜湊值
 
   //設定本次區塊資料
   const currentBlockData = {
     transactions: chain.pendingTransactions, //待交易的資料
-    index: lastBlock.index + 1 //資料index..因為第1筆index是創世block，所以index都加1才是正確要運算的資料
+    index: lastBlock.index + 1 //設定index..當然是上筆資料index + 1
   }
-
-  const nonce = chain.proofOfWork(previousBlockHash, currentBlockData); //開始運算挖礦
-
-  const blockHash = chain.hashBlock(previousBlockHash, currentBlockData, nonce); //取得hash過後的block
-
-  chain.createNewTransaction(12.5, "00", nodeAddress); //給礦工的
+  const nonce = chain.proofOfWork(previousBlockHash, currentBlockData); //開始運算挖礦囉
+  const blockHash = chain.hashBlock(previousBlockHash, currentBlockData, nonce); //將區塊資料hash
 
   const newBlock = chain.createNewBlock(nonce, previousBlockHash, blockHash); //建立新的區塊
 
-  res.json({
-    note: "New block mined successfully",
-    block: newBlock
+  /*--------------------------------
+   | 礦工挖好礦了，通知各個節點儲存新區塊
+   |--------------------------------
+   | 輪循裝載到promise array裡
+   | 然後再用promise all方式一次通知
+   |
+   */
+  const requestPromises = [];
+
+  chain.networkNodes.forEach(networkNodeUrl => {
+    const requestOptions = {
+      uri: networkNodeUrl + '/receive-new-block',
+      method: 'POST',
+      body: { newBlock: newBlock },
+      json: true
+    };
+
+    requestPromises.push(rp(requestOptions));
   });
+
+  Promise.all(requestPromises)
+    .then(data => {
+      const requestOptions = {
+        uri: chain.currentNodeUrl + '/transaction/broadcast',
+        method: 'POST',
+        body: { //給礦工的
+          amount: 12.5,
+          sender: "00",
+          recipient: nodeAddress
+        },
+        json: true
+      };
+
+      return rp(requestOptions);
+    })
+    .then(data => {
+      res.json({
+        note: "New block mined & broadcast successfully",
+        block: newBlock
+      });
+    });
 });
+
+app.post('/receive-new-block', (req, res) => {
+  const newBlock = req.body.newBlock;
+  const lastBlock = chain.getLastBlock(); //取得最後一個block出來
+
+  /*--------------------------------
+   | 判斷區塊的順序正不正確..正確才能加入鏈中
+   |--------------------------------
+   | 我們在每個區塊都有記錄previousBlockHash的值
+   | 所以最後一個block的hash value值，應該要等於新block的previousBlockHash
+   | And
+   | 我們在每個區塊都有記錄index的值
+   | 所以最後一個block的值+1後，應該要跟新block的index相等
+   |
+   */
+  const correctHash = lastBlock.hash === newBlock.previousBlockHash;
+  const correctIndex = lastBlock.index + 1 === newBlock.index; //chain的最後一個block index + 1是不是等於新block的index
+
+  if(correctHash && correctIndex){
+    chain.chain.push(newBlock); //加入新的區塊
+    chain.pendingTransactions = []; //清空pending的交易，因為以經運算完了
+    res.json({
+      note: 'New block received and accepted. ',
+      newBlock: newBlock
+    })
+  } else {
+    res.json({
+      note: 'New block rejected. ',
+      newBlock: newBlock
+    })
+  }
+})
 
 /**
  * 註冊並廣播給其它node

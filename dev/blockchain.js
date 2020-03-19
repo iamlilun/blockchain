@@ -17,7 +17,7 @@ class Blockchain {
 
   /**
    * 建立新區塊
-   * @param nonce: 隨機數
+   * @param nonce: hash累計次數
    * @param previousBlockHash: 上一個hash值
    * @param hash: 這一次的hash值
    * @returns {{previousBlockHash: *, index: number, transactions: ([]|*[]), nonce: *, hash: *, timestamp: number}}
@@ -27,7 +27,7 @@ class Blockchain {
       index: this.chain.length + 1, //block id
       timestamp: Date.now(), //區塊建立時間
       transactions: this.pendingTransactions,
-      nonce: nonce, //隨機數
+      nonce: nonce,
       hash: hash,
       previousBlockHash: previousBlockHash, //前一個block的hash
     }
@@ -78,7 +78,7 @@ class Blockchain {
    * 雜湊區塊資料
    * @param previousBlockHash: 上一個區塊的hash資料
    * @param currentBlockData: 現在的區塊資料
-   * @param nonce: 隨機數
+   * @param nonce: hash次數累計
    */
   hashBlock(previousBlockHash, currentBlockData, nonce) {
     const dataAsString = previousBlockHash + nonce.toString() + JSON.stringify(currentBlockData);
@@ -92,11 +92,12 @@ class Blockchain {
    * @returns {number}
    */
   proofOfWork(previousBlockHash, currentBlockData){
-    let nonce = 0;
+    let nonce = 0; //計數器
     let hash = this.hashBlock(previousBlockHash, currentBlockData, nonce);
     while (hash.substring(0, 4) !== '0000'){
       nonce ++;
       hash = this.hashBlock(previousBlockHash, currentBlockData, nonce);
+      console.log('H', hash);
     }
 
     return nonce;
