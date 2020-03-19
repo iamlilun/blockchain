@@ -6,7 +6,7 @@ const uuid = require('uuid/v1');
 const port = process.argv[2];
 const rp = require('request-promise');
 
-const nodeAddress = uuid.split('-').join('');
+const nodeAddress = uuid().split('-').join('');
 
 const chain = new Blockchain();
 
