@@ -1,18 +1,17 @@
-const sha256 = require('sha256');
-const uuid = require('uuid/v1');
+const sha256 = require('sha256')
+const uuid = require('uuid/v1')
 
-
-const currentNodeUrl = process.argv[3];
+const currentNodeUrl = process.argv[3]
 
 class Blockchain {
   constructor () {
-    this.chain = [];
-    this.pendingTransactions = []; //待交易的資料
+    this.chain = []
+    this.pendingTransactions = [] //待交易的資料
 
-    this.currentNodeUrl = currentNodeUrl;
-    this.networkNodes = [];
+    this.currentNodeUrl = currentNodeUrl
+    this.networkNodes = []
 
-    this.createNewBlock(100, '0', '0');
+    this.createNewBlock(100, '0', '0'); //建立創世block
   }
 
   /**
@@ -22,7 +21,7 @@ class Blockchain {
    * @param hash: 這一次的hash值
    * @returns {{previousBlockHash: *, index: number, transactions: ([]|*[]), nonce: *, hash: *, timestamp: number}}
    */
-  createNewBlock(nonce, previousBlockHash, hash){
+  createNewBlock (nonce, previousBlockHash, hash) {
     const newBlock = {
       index: this.chain.length + 1, //block id
       timestamp: Date.now(), //區塊建立時間
@@ -32,18 +31,18 @@ class Blockchain {
       previousBlockHash: previousBlockHash, //前一個block的hash
     }
 
-    this.pendingTransactions = [];
-    this.chain.push(newBlock);
+    this.pendingTransactions = []
+    this.chain.push(newBlock)
 
-    return newBlock;
+    return newBlock
   }
 
   /**
    * 最得最後一個區塊資料
    * @returns {*}
    */
-  getLastBlock() {
-    return this.chain[this.chain.length - 1];
+  getLastBlock () {
+    return this.chain[this.chain.length - 1]
   }
 
   /**
@@ -53,7 +52,7 @@ class Blockchain {
    * @param recipient: 接收者
    * @returns {*}
    */
-  createNewTransaction(amount, sender, recipient) {
+  createNewTransaction (amount, sender, recipient) {
     const newTransaction = {
       amount: amount,
       sender: sender,
@@ -61,7 +60,7 @@ class Blockchain {
       transactionId: uuid().split('-').join(''),
     }
 
-    return newTransaction;
+    return newTransaction
   }
 
   /**
@@ -69,9 +68,9 @@ class Blockchain {
    * @param {object} transaction: 交易資料
    * @returns {*}
    */
-  addTransactionToPendingTransaction(transaction){
-    this.pendingTransactions.push(transaction);
-    return this.getLastBlock().index + 1;
+  addTransactionToPendingTransaction (transaction) {
+    this.pendingTransactions.push(transaction)
+    return this.getLastBlock().index + 1
   }
 
   /**
@@ -80,9 +79,9 @@ class Blockchain {
    * @param currentBlockData: 現在的區塊資料
    * @param nonce: hash次數累計
    */
-  hashBlock(previousBlockHash, currentBlockData, nonce) {
-    const dataAsString = previousBlockHash + nonce.toString() + JSON.stringify(currentBlockData);
-    return sha256(dataAsString);
+  hashBlock (previousBlockHash, currentBlockData, nonce) {
+    const dataAsString = previousBlockHash + nonce.toString() + JSON.stringify(currentBlockData)
+    return sha256(dataAsString)
   }
 
   /**
@@ -91,17 +90,77 @@ class Blockchain {
    * @param currentBlockData: 現在的區塊資料
    * @returns {number}
    */
-  proofOfWork(previousBlockHash, currentBlockData){
-    let nonce = 0; //計數器
-    let hash = this.hashBlock(previousBlockHash, currentBlockData, nonce);
-    while (hash.substring(0, 4) !== '0000'){
-      nonce ++;
-      hash = this.hashBlock(previousBlockHash, currentBlockData, nonce);
-      console.log('H', hash);
+  proofOfWork (previousBlockHash, currentBlockData) {
+    let nonce = 0 //計數器
+    let hash = this.hashBlock(previousBlockHash, currentBlockData, nonce)
+    while (hash.substring(0, 4) !== '0000') {
+      nonce++
+      hash = this.hashBlock(previousBlockHash, currentBlockData, nonce)
+      console.log('H', hash)
     }
 
-    return nonce;
+    return nonce
+  }
+
+  /**
+   * 驗證鏈的正確性
+   * @param {Array} blockchain: 整個區塊鏈
+   * @returns {boolean}
+   */
+  chainIsValid (blockchain) {
+    let validChain = true
+
+    /*--------------------------------
+     | 每個block逐一檢查
+     |--------------------------------
+     | 透過前4碼是不是等於0000，來驗證proof of work資料是不是正確
+     | 再透過block所記錄的上一次hash值，是不是真的跟上一區塊hash值一樣，來驗證鏈的資料
+     |
+     |
+     */
+    for (let i = 1; i < blockchain.length; i++) {
+      const currentBlock = blockchain[i] //目前區塊資料
+      const prevBlock = blockchain[i - 1] //上一區塊資料
+
+      //validate block hash value
+      if (currentBlock.previousBlockHash !== prevBlock.hash) {
+        validChain = false
+      }
+
+      //validate proof of work
+      const {transactions, index} = currentBlock;
+      const blockHash = this.hashBlock(prevBlock.hash, //取得hash後的區塊資料
+        {
+          transactions,
+          index
+        },
+        currentBlock.nonce);
+
+
+      if(blockHash.substring(0, 4) !== '0000'){
+        validChain = false;
+      }
+    }
+
+    /*--------------------------------
+     | 透過創世區塊來檢查
+     |--------------------------------
+     | 一個不合就等於有資料是假的
+     |
+     |
+     */
+    const gensisBlock = blockchain[0];
+    const correctNonce = gensisBlock.nonce === 100;
+    const correctPreviousBlockHash = gensisBlock.previousBlockHash === '0';
+    const correctHash = gensisBlock.hash === '0';
+    const correctTransactions = gensisBlock.transactions.length === 0;
+
+    if(!correctNonce || !correctPreviousBlockHash || !correctHash || !correctTransactions){
+      validChain = false;
+    }
+
+    return validChain;
   }
 }
 
-module.exports = Blockchain;
+module.exports = Blockchain
