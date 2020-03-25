@@ -301,14 +301,52 @@ app.get('/consensus', (req, res) => {
           chain: chain.chain
         })
       } else if (newLongerChain && chain.chainIsValid(newLongerChain)) { //如果有新長度的資料也驗證過了，就更換本機鏈的資料
-        chain.chain = newLongerChain;
-        chain.pendingTransactions = newPendingTransaction;
+        chain.chain = newLongerChain
+        chain.pendingTransactions = newPendingTransaction
         res.json({
           note: 'This chain has been replaced.',
           chain: chain.chain
         })
       }
     })
+})
+
+/**
+ * 透過hash值取得block資料
+ */
+app.get('/block/:blockHash', (req, res) => {
+  const correctBlock = chain.getBlock(req.params.blockHash)
+
+  res.json({
+    block: correctBlock
+  })
+})
+
+/**
+ * 透過交易id取得交易資料
+ */
+app.get('/transaction/:transactionId', (req, res) => {
+  const { transaction, block } = chain.getTransaction(req.params.transactionId)
+
+  res.json({
+    transaction,
+    block
+  })
+})
+
+/**
+ * 透過錢包地址取得交易資料
+ */
+app.get('/address/:address', (req, res) => {
+  const addressData = chain.getAddressData(req.params.address)
+
+  res.json({
+    addressData
+  })
+})
+
+app.get('/block-explorer', (req, res) => {
+  res.sendfile('./block-explorer/index.html', {root: __dirname})
 })
 
 app.listen(port, () => {

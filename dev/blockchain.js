@@ -161,6 +161,91 @@ class Blockchain {
 
     return validChain;
   }
+
+  /**
+   * 透過hash value 取得該區塊的資料
+   * @param blockHash: block的hash value
+   * @returns {null}
+   */
+  getBlock(blockHash){
+
+    let correctBlock = null;
+
+    //每個block比對hash value
+    this.chain.forEach(block => {
+      if(block.hash === blockHash){
+        correctBlock = block;
+      }
+    })
+
+    return correctBlock;
+  }
+
+  /**
+   * 方過交易的id 最得交易資料
+   * @param transactionId: 交易id
+   * @returns {{block: null, transaction: null}}
+   */
+  getTransaction(transactionId) {
+    let correctTransaction = null; //正確的交易資料，預設null
+    let correctBlock = null; //正確的區塊資料，預設null
+
+    //從每個區塊的交易內逐一筆對id..
+    this.chain.forEach(block => {
+      block.transactions.forEach(transaction => {
+        //id相同就賦值給正確資料的變數
+        if(transaction.transactionId === transactionId){
+          correctTransaction = transaction;
+          correctBlock = block;
+        }
+      })
+    })
+
+    return {
+      transaction: correctTransaction,
+      block: correctBlock
+    }
+  }
+
+  /**
+   * 依錢包地址取得交易資料
+   * @param address: 錢包地址
+   * @returns {{addressTransactions: [], addressBalance: number}}
+   */
+  getAddressData(address) {
+    const addressTransactions = []; //用來儲存跟這地址向關的交易資料
+
+    //從每個區塊的交易內逐一筆對地址..
+    this.chain.forEach(block => {
+      block.transactions.forEach(transaction => {
+        //支出的或收入的都存到addressTransactions裡
+        if(transaction.sender === address || transaction.recipient === address){
+          addressTransactions.push(transaction);
+        }
+      })
+    })
+
+    //計算總金額
+    let balance = 0;
+
+    addressTransactions.forEach(transaction => {
+      //收到的
+      if(transaction.recipient === address){
+        balance += transaction.amount;
+      }
+
+      //支出的
+      if(transaction.sender === address){
+        balance -= transaction.amount;
+      }
+    })
+
+    return {
+      addressTransactions,
+      addressBalance: balance
+    }
+  }
+
 }
 
 module.exports = Blockchain
